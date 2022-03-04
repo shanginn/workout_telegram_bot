@@ -1,47 +1,57 @@
 use chrono::prelude::*;
 use chrono::Duration;
-use frankenstein::{EditMessageResponse, EditMessageTextParams, Error, MethodResponse, PinChatMessageParams, TelegramApi, UnpinAllChatMessagesParams, UnpinChatMessageParams};
 use frankenstein::{Api, GetUpdatesParams};
+use frankenstein::{
+    EditMessageResponse, EditMessageTextParams, Error, MethodResponse, PinChatMessageParams,
+    TelegramApi, UnpinChatMessageParams, Update,
+};
+use frankenstein::{
+    EditMessageTextParamsBuilder, Message, PinChatMessageParamsBuilder, SendMessageParamsBuilder,
+    UnpinChatMessageParamsBuilder,
+};
 use frankenstein::{GetUpdatesParamsBuilder, SendMessageParams};
-use frankenstein::{Message, SendMessageParamsBuilder, EditMessageTextParamsBuilder, PinChatMessageParamsBuilder, UnpinChatMessageParamsBuilder, UnpinAllChatMessagesParamsBuilder};
 use std::collections::HashMap;
 use std::env;
 use std::sync::{Arc, Mutex};
 use tokio::time;
 
-const CHAT_ID: i64 = -1001559532421;
-
 struct ContextData {
+    chat_id: Option<i64>,
     daily_message_id: Option<i32>,
     current_day: usize,
     duration: usize,
     repeats: usize,
     progress: Vec<HashMap<String, usize>>,
     users: Vec<String>,
-    api: Option<Api>
+    api: Option<Api>,
 }
 
 struct Context {
-    data: Mutex<ContextData>
+    data: Mutex<ContextData>,
 }
 
 impl Default for Context {
     fn default() -> Self {
-        Context{
+        Context {
             data: Mutex::new(ContextData {
+                chat_id: None,
                 daily_message_id: None,
                 current_day: 0,
                 duration: 3,
                 repeats: 100,
                 progress: vec![HashMap::new()],
                 users: vec![],
-                api: None
-            })
+                api: None,
+            }),
         }
     }
 }
 
 impl Context {
+    pub fn get_chat_id(&self) -> i64 {
+        self.data.lock().unwrap().chat_id.unwrap()
+    }
+
     pub fn is_user_done(&self, username: String) -> bool {
         let data = self.data.lock().unwrap();
 
@@ -89,7 +99,7 @@ impl Context {
         let current_day = data.current_day;
         let duration = data.duration;
         let users = &data.users.clone();
-        let progress= &data.progress;
+        let progress = &data.progress;
 
         for username in users {
             text += &format!(
@@ -119,8 +129,7 @@ impl Context {
         let mut text = "".to_string();
         text += &format!(
             "Тренировка окончена! Мы прозанимались {} дней и отжались {} раз на всех.\n",
-            data.duration,
-            total_progress
+            data.duration, total_progress
         );
 
         for (username, count) in users_progress.into_iter() {
@@ -131,33 +140,43 @@ impl Context {
     }
 
     pub fn send_message(&self, text: String) -> Option<Message> {
+        let data = self.data.lock().unwrap();
+
         let send_message_params: SendMessageParams = SendMessageParamsBuilder::default()
-            .chat_id(CHAT_ID)
+            .chat_id(data.chat_id.unwrap())
             .text(text)
             .build()
             .unwrap();
 
-        return match self.data.lock().unwrap().api.as_ref().unwrap().send_message(&send_message_params) {
-            Ok(response) => {
-                Some(response.result)
-            }
+        return match data
+            .api
+            .as_ref()
+            .unwrap()
+            .send_message(&send_message_params)
+        {
+            Ok(response) => Some(response.result),
             Err(err) => {
                 println!("Failed to send message: {:?}", err);
                 None
             }
-        }
+        };
     }
 
     pub fn pin_daily_message(&self) {
-        let daily_message_id = self.data.lock().unwrap().daily_message_id.clone();
-        if let Some(daily_message_id) = daily_message_id {
+        let data = self.data.lock().unwrap();
+
+        if let Some(daily_message_id) = data.daily_message_id {
             let pin_message_params: PinChatMessageParams = PinChatMessageParamsBuilder::default()
-                .chat_id(CHAT_ID)
+                .chat_id(data.chat_id.unwrap())
                 .message_id(daily_message_id)
                 .build()
                 .unwrap();
 
-            let result = self.data.lock().unwrap().api.as_ref().unwrap().pin_chat_message(&pin_message_params);
+            let result = data
+                .api
+                .as_ref()
+                .unwrap()
+                .pin_chat_message(&pin_message_params);
 
             if let Err(err) = result {
                 println!("Error pining daily message: {:?}", err);
@@ -166,20 +185,58 @@ impl Context {
     }
 
     pub fn unpin_daily_message(&self) {
-        let daily_message_id = self.data.lock().unwrap().daily_message_id.clone();
-        if let Some(daily_message_id) = daily_message_id {
-            let unpin_message_params: UnpinChatMessageParams = UnpinChatMessageParamsBuilder::default()
-                .chat_id(CHAT_ID)
-                .message_id(daily_message_id)
-                .build()
-                .unwrap();
+        let data = self.data.lock().unwrap();
 
-            let result = self.data.lock().unwrap().api.as_ref().unwrap().unpin_chat_message(&unpin_message_params);
+        if let Some(daily_message_id) = data.daily_message_id {
+            let unpin_message_params: UnpinChatMessageParams =
+                UnpinChatMessageParamsBuilder::default()
+                    .chat_id(data.chat_id.unwrap())
+                    .message_id(daily_message_id)
+                    .build()
+                    .unwrap();
+
+            let result = data
+                .api
+                .as_ref()
+                .unwrap()
+                .unpin_chat_message(&unpin_message_params);
 
             if let Err(err) = result {
                 println!("Error unpining daily message: {:?}", err);
             }
         }
+    }
+
+    fn update_daily_message(&self) -> Result<EditMessageResponse, frankenstein::Error> {
+        let text = self.generate_daily_message();
+        let data = self.data.lock().unwrap();
+
+        let update_message_params: EditMessageTextParams = EditMessageTextParamsBuilder::default()
+            .chat_id(data.chat_id.unwrap())
+            .message_id(data.daily_message_id.unwrap())
+            .text(text)
+            .build()
+            .unwrap();
+
+        data.api
+            .as_ref()
+            .unwrap()
+            .edit_message_text(&update_message_params)
+    }
+
+    fn get_updates(&self) -> Result<MethodResponse<Vec<Update>>, Error> {
+        let update_params: GetUpdatesParams = GetUpdatesParamsBuilder::default()
+            .allowed_updates(vec!["message".to_string()])
+            .build()
+            .unwrap();
+
+        self.data
+            .lock()
+            .unwrap()
+            .api
+            .as_ref()
+            .unwrap()
+            .get_updates(&update_params)
     }
 }
 
@@ -187,13 +244,17 @@ impl Context {
 async fn main() {
     let context = Arc::new(Context::default());
     let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
+    let chat_id = env::var("CHAT_ID")
+        .expect("CHAT_ID not set")
+        .parse()
+        .unwrap();
     let api = Api::new(&token);
 
     context.data.lock().unwrap().api = Some(api);
+    context.data.lock().unwrap().chat_id = Some(chat_id);
 
     let cloned_context = Arc::clone(&context);
-    let updates_handler =
-        tokio::spawn(async move { get_updates(cloned_context).await });
+    let updates_handler = tokio::spawn(async move { get_updates(cloned_context).await });
 
     let cloned_context = Arc::clone(&context);
     let daily_message_sender =
@@ -216,28 +277,13 @@ async fn send_daily_message(context: Arc<Context>) {
         time::sleep(get_day_duration()).await;
 
         if context.is_workout_over() {
-            context.send_message(
-                context.generate_final_message()
-            );
+            context.send_message(context.generate_final_message());
 
             return;
         }
 
         context.init_next_day();
     }
-}
-
-fn update_daily_message(context: &Arc<Context>) -> Result<EditMessageResponse, frankenstein::Error> {
-    let text = context.generate_daily_message();
-
-    let update_message_params: EditMessageTextParams = EditMessageTextParamsBuilder::default()
-        .chat_id(CHAT_ID)
-        .message_id(context.data.lock().unwrap().daily_message_id.unwrap())
-        .text(text)
-        .build()
-        .unwrap();
-
-    context.data.lock().unwrap().api.as_ref().unwrap().edit_message_text(&update_message_params)
 }
 
 fn get_day_duration() -> core::time::Duration {
@@ -252,26 +298,24 @@ fn get_day_duration() -> core::time::Duration {
 }
 
 async fn get_updates(context: Arc<Context>) {
-    let token = env::var("TELEGRAM_BOT_TOKEN").expect("TELEGRAM_BOT_TOKEN not set");
-    let api = Api::new(&token);
-
-    let mut update_params: GetUpdatesParams = GetUpdatesParamsBuilder::default().build().unwrap();
-    update_params.allowed_updates = Some(vec!["message".to_string()]);
     let update_delay = Duration::seconds(1).to_std().unwrap();
+    println!("1 2 3 4");
+    let chat_id = context.get_chat_id();
+    println!("{}", chat_id);
 
     loop {
+        println!("result: 1");
         time::sleep(update_delay).await;
-        let result = api.get_updates(&update_params);
+        println!("result: 2");
+        let result = context.get_updates();
 
         println!("result: {:?}", result);
 
         match result {
             Ok(response) => {
                 for update in response.result {
-                    update_params.offset = Some(update.update_id + 1);
-
                     if let Some(message) = update.message {
-                        if message.chat.id == CHAT_ID {
+                        if message.chat.id == chat_id {
                             process_message(message, &context);
                         }
                     }
@@ -303,7 +347,7 @@ fn process_message(message: Message, context: &Arc<Context>) {
 
     context.add_user_progress(username.clone(), count);
 
-    match update_daily_message(context) {
+    match context.update_daily_message() {
         Ok(response) => println!("Edit ok: {:?}", response),
         Err(err) => println!("Failed to update daily message: {:?}", err),
     }
