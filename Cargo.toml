@@ -1,0 +1,11 @@
+[package]
+name = "rust-bot-2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+frankenstein = "0.10"
+tokio = { version ="1", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+chrono = "0.4"
