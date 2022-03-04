@@ -299,14 +299,10 @@ fn get_day_duration() -> core::time::Duration {
 
 async fn get_updates(context: Arc<Context>) {
     let update_delay = Duration::seconds(1).to_std().unwrap();
-    println!("1 2 3 4");
     let chat_id = context.get_chat_id();
-    println!("{}", chat_id);
 
     loop {
-        println!("result: 1");
         time::sleep(update_delay).await;
-        println!("result: 2");
         let result = context.get_updates();
 
         println!("result: {:?}", result);
