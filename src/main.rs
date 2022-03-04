@@ -224,19 +224,14 @@ impl Context {
             .edit_message_text(&update_message_params)
     }
 
-    fn get_updates(&self) -> Result<MethodResponse<Vec<Update>>, Error> {
-        let update_params: GetUpdatesParams = GetUpdatesParamsBuilder::default()
-            .allowed_updates(vec!["message".to_string()])
-            .build()
-            .unwrap();
-
+    fn get_updates(&self, update_params: &GetUpdatesParams) -> Result<MethodResponse<Vec<Update>>, Error> {
         self.data
             .lock()
             .unwrap()
             .api
             .as_ref()
             .unwrap()
-            .get_updates(&update_params)
+            .get_updates(update_params)
     }
 }
 
@@ -300,16 +295,22 @@ fn get_day_duration() -> core::time::Duration {
 async fn get_updates(context: Arc<Context>) {
     let update_delay = Duration::seconds(1).to_std().unwrap();
     let chat_id = context.get_chat_id();
+    let mut update_params: GetUpdatesParams = GetUpdatesParamsBuilder::default()
+        .allowed_updates(vec!["message".to_string()])
+        .build()
+        .unwrap();
 
     loop {
         time::sleep(update_delay).await;
-        let result = context.get_updates();
+        let result = context.get_updates(&update_params);
 
         println!("result: {:?}", result);
 
         match result {
             Ok(response) => {
                 for update in response.result {
+                    update_params.offset = Some(update.update_id + 1);
+
                     if let Some(message) = update.message {
                         if message.chat.id == chat_id {
                             process_message(message, &context);
