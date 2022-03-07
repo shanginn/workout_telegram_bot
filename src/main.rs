@@ -38,7 +38,7 @@ impl Default for Context {
                 daily_message_id: None,
                 current_day: 0,
                 duration: 3,
-                repeats: 100,
+                repeats: 120,
                 progress: vec![HashMap::new()],
                 users: vec![],
                 api: None,
@@ -284,7 +284,9 @@ async fn send_daily_message(context: Arc<Context>) {
 fn get_day_duration() -> core::time::Duration {
     // return Duration::seconds(5).to_std().unwrap();
     let now = Utc::now();
-    let tomorrow_midnight = (now + Duration::days(1)).date().and_hms(0, 0, 0);
+    let tomorrow_midnight = (now + Duration::days(1))
+        .date()
+        .and_hms(0, 0, 0) - Duration::hours(2);
 
     tomorrow_midnight
         .signed_duration_since(now)
