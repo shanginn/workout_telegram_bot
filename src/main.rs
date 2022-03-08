@@ -286,12 +286,12 @@ fn get_day_duration() -> core::time::Duration {
     let now = Utc::now();
     let tomorrow_midnight = (now + Duration::days(1))
         .date()
-        .and_hms(0, 0, 0) - Duration::hours(2);
+        .and_hms(0, 0, 0);
 
     tomorrow_midnight
         .signed_duration_since(now)
         .to_std()
-        .unwrap()
+        .unwrap() - core::time::Duration::from_secs(2 * 60 * 60)
 }
 
 async fn get_updates(context: Arc<Context>) {
