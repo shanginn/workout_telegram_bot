@@ -12,6 +12,7 @@ use frankenstein::{
 use frankenstein::{GetUpdatesParamsBuilder, SendMessageParams};
 use std::collections::HashMap;
 use std::env;
+use std::error::Error;
 use std::sync::{Arc, Mutex};
 use tokio::time;
 
@@ -245,7 +246,7 @@ async fn main() {
         .unwrap();
     let api = Api::new(&token);
 
-    context.data.lock().unwrap().api = Some(api);
+    context.data.lock().unwrap().api = Some(api.clone());
     context.data.lock().unwrap().chat_id = Some(chat_id);
 
     let cloned_context = Arc::clone(&context);
@@ -255,7 +256,11 @@ async fn main() {
     let daily_message_sender =
         tokio::spawn(async move { send_daily_message(cloned_context).await });
 
-    tokio::try_join!(updates_handler, daily_message_sender).unwrap();
+    tokio::try_join!(updates_handler, daily_message_sender)
+        .unwrap_or_else(|err| {
+            context.send_message(format!("Бот устал: {}", err.to_string()));
+            ((), ())
+        });
 }
 
 async fn send_daily_message(context: Arc<Context>) {
@@ -284,14 +289,14 @@ async fn send_daily_message(context: Arc<Context>) {
 fn get_day_duration() -> core::time::Duration {
     // return Duration::seconds(5).to_std().unwrap();
     let now = Utc::now();
-    let tomorrow_midnight = (now + Duration::days(1))
+    let tomorrow_midnight = (now)
         .date()
-        .and_hms(0, 0, 0);
+        .and_hms(22, 0, 0);
 
     tomorrow_midnight
         .signed_duration_since(now)
         .to_std()
-        .unwrap() - core::time::Duration::from_secs(2 * 60 * 60)
+        .unwrap()
 }
 
 async fn get_updates(context: Arc<Context>) {
