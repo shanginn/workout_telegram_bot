@@ -12,7 +12,6 @@ use frankenstein::{
 use frankenstein::{GetUpdatesParamsBuilder, SendMessageParams};
 use std::collections::HashMap;
 use std::env;
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 use tokio::time;
 
@@ -146,6 +145,7 @@ impl Context {
         let send_message_params: SendMessageParams = SendMessageParamsBuilder::default()
             .chat_id(data.chat_id.unwrap())
             .text(text)
+            .disable_notification(true)
             .build()
             .unwrap();
 
@@ -170,6 +170,7 @@ impl Context {
             let pin_message_params: PinChatMessageParams = PinChatMessageParamsBuilder::default()
                 .chat_id(data.chat_id.unwrap())
                 .message_id(daily_message_id)
+                .disable_notification(true)
                 .build()
                 .unwrap();
 
