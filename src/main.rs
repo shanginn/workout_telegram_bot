@@ -279,6 +279,7 @@ async fn send_daily_message(context: Arc<Context>) {
 
         if context.is_workout_over() {
             context.send_message(context.generate_final_message());
+            context.unpin_daily_message();
 
             return;
         }
