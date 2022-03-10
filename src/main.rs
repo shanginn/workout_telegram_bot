@@ -293,7 +293,7 @@ fn get_day_duration() -> core::time::Duration {
     let now = Utc::now();
     let tomorrow_midnight = (now)
         .date()
-        .and_hms(22, 0, 0);
+        .and_hms(0, 0, 0);
 
     tomorrow_midnight
         .signed_duration_since(now)
