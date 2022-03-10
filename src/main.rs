@@ -291,7 +291,7 @@ async fn send_daily_message(context: Arc<Context>) {
 fn get_day_duration() -> core::time::Duration {
     // return Duration::seconds(5).to_std().unwrap();
     let now = Utc::now();
-    let tomorrow_midnight = (now)
+    let tomorrow_midnight = (now + Duration::days(1))
         .date()
         .and_hms(0, 0, 0);
 
