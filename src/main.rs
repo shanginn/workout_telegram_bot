@@ -19,6 +19,8 @@ struct ContextData {
     chat_id: Option<i64>,
     daily_message_id: Option<i32>,
     current_day: usize,
+    cycle_length: usize,
+    cycle_increase: usize,
     duration: usize,
     repeats: usize,
     progress: Vec<HashMap<String, usize>>,
@@ -37,6 +39,8 @@ impl Default for Context {
                 chat_id: None,
                 daily_message_id: None,
                 current_day: 0,
+                cycle_length: 1, //TODO: 7 or 30
+                cycle_increase: 10,
                 duration: 3,
                 repeats: 120,
                 progress: vec![HashMap::new()],
@@ -82,9 +86,19 @@ impl Context {
         *data.progress[current_day].entry(username).or_insert(0) += count;
     }
 
-    pub fn init_next_day(&self) {
-        self.data.lock().unwrap().current_day += 1;
-        self.data.lock().unwrap().progress.push(HashMap::new());
+    pub fn init_next_day(&self) -> bool {
+        let data = &mut self.data.lock().unwrap();
+
+        data.current_day += 1;
+        data.progress.push(HashMap::new());
+
+        if data.current_day % data.cycle_length == 0 {
+            data.repeats += data.cycle_increase;
+
+            return true;
+        }
+
+        false
     }
 
     pub fn is_workout_over(&self) -> bool {
@@ -109,7 +123,7 @@ impl Context {
             );
         }
 
-        text += &format!("День {}/{}\n", current_day + 1, duration);
+        text += &format!("День {}. {} повторений\n", current_day + 1, data.repeats);
 
         text
     }
@@ -133,10 +147,20 @@ impl Context {
         );
 
         for (username, count) in users_progress.into_iter() {
-            text += &format!("{}: {}", username, count);
+            text += &format!("{}: {}\n", username, count);
         }
 
         text
+    }
+
+    pub fn generate_end_of_cycle_message(&self) -> String {
+        let data = self.data.lock().unwrap();
+
+        format!(
+            "Очередной цикл завершён! Увеличиваем повторения с {} до {}.",
+            data.repeats - data.cycle_increase,
+            data.repeats
+        )
     }
 
     pub fn send_message(&self, text: String) -> Option<Message> {
@@ -284,7 +308,11 @@ async fn send_daily_message(context: Arc<Context>) {
             return;
         }
 
-        context.init_next_day();
+        let cycle_ended = context.init_next_day();
+
+        if cycle_ended {
+            context.send_message(context.generate_end_of_cycle_message());
+        }
     }
 }
 
