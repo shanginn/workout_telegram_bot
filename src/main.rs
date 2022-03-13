@@ -111,7 +111,6 @@ impl Context {
         let data = self.data.try_lock().unwrap();
 
         let current_day = data.current_day;
-        let duration = data.duration;
         let users = &data.users.clone();
         let progress = &data.progress;
 
