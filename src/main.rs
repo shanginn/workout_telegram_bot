@@ -1,15 +1,15 @@
 pub mod context;
 pub mod lib;
 
+use crate::context::{ContextCommand, ContextData, Contexts};
 use chrono::prelude::*;
 use chrono::Duration;
 use frankenstein::{Api, GetUpdatesParams, GetUpdatesParamsBuilder, TelegramApi, Update};
 use std::env;
 use std::sync::{Arc, Mutex};
-use tokio::time;
-use crate::context::{ContextCommand, ContextData, Contexts};
-use tokio::sync::{mpsc};
+use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
+use tokio::time;
 
 #[tokio::main]
 async fn main() {
@@ -112,7 +112,8 @@ async fn get_all_updates(api: Api, contexts: Arc<Mutex<Contexts>>) {
 
                         let tx = txs[&chat_id].clone();
                         tokio::spawn(async move {
-                            tx.send(ContextCommand::AddPushups { username, count }).await;
+                            tx.send(ContextCommand::AddPushups { username, count })
+                                .await;
                         });
                     }
                 }
@@ -124,57 +125,6 @@ async fn get_all_updates(api: Api, contexts: Arc<Mutex<Contexts>>) {
     }
 }
 
-// async fn get_all_updates(api: Api, contexts: Arc<Contexts>) {
-//     let update_delay = Duration::seconds(1).to_std().unwrap();
-//
-//     let mut update_params: GetUpdatesParams = GetUpdatesParamsBuilder::default()
-//         .allowed_updates(strings_vec!["message", "edited_message"])
-//         .build()
-//         .unwrap();
-//
-//     loop {
-//         time::sleep(update_delay).await;
-//         let result = api.get_updates(&update_params);
-//
-//         println!("result: {:?}", result);
-//
-//         match result {
-//             Ok(response) => {
-//                 for update in response.result {
-//                     update_params.offset = Some(update.update_id + 1);
-//                     let (update, chat_id) = get_chat_id_from_update(update);
-//
-//                     let chat_id = match chat_id {
-//                         Some(chat_id) => chat_id,
-//                         None => continue,
-//                     };
-//
-//                     if !contexts.txs.contains_key(&chat_id) {
-//                         if let Some(message) = update.message.clone() {
-//                             if let Some(text) = message.text {
-//                                 if text == "/start" {
-//                                     init_context(&mut contexts, chat_id, api.clone());
-//                                 }
-//                             }
-//                         }
-//                     }
-//
-//                     if contexts.txs.contains_key(&chat_id) {
-//                         //process_update(update, contexts.get(&chat_id).unwrap());
-//                         contexts.txs[&chat_id].send(ContextCommand::AddPushups {
-//                             username: "shanginn".to_string(),
-//                             count: 10,
-//                         }).await;
-//                     }
-//                 }
-//             }
-//             Err(error) => {
-//                 println!("Failed to get updates: {:?}", error);
-//             }
-//         }
-//     }
-// }
-
 fn init_context(contexts: Arc<Mutex<Contexts>>, chat_id: i64, api: Api) {
     let (tx, rx) = mpsc::channel(2048);
     let cloned_tx = tx.clone();
@@ -184,17 +134,7 @@ fn init_context(contexts: Arc<Mutex<Contexts>>, chat_id: i64, api: Api) {
 
     tokio::spawn(async move { handle_commands(context_data, rx).await });
 
-    tokio::spawn(async move {
-        tx.send(ContextCommand::SendDailyMessage).await
-    });
-
-    // let context = Arc::new(Context::new(chat_id, api));
-    //
-    // let cloned_context = Arc::clone(&context);
-    // contexts.insert(chat_id, cloned_context);
-    //
-    // let cloned_context = Arc::clone(&context);
-    // tokio::spawn(async move { send_daily_message(cloned_context).await });
+    tokio::spawn(async move { tx.send(ContextCommand::SendDailyMessage).await });
 }
 
 pub async fn handle_commands(mut context_data: ContextData, mut rx: Receiver<ContextCommand>) {
@@ -222,7 +162,7 @@ pub async fn handle_commands(mut context_data: ContextData, mut rx: Receiver<Con
                     context_data.daily_message_id = Some(message.message_id);
                     context_data.pin_daily_message();
                 }
-            },
+            }
             ContextCommand::AddPushups { username, count } => {
                 context_data.add_user_progress(username.clone(), count);
 
@@ -256,42 +196,7 @@ fn get_chat_id_from_update(update: Update) -> (Update, Option<i64>) {
         (update, None)
     }
 }
-//
-// fn process_update(update: Update, context: &Arc<Context>) {
-//     if let Some(message) = update.message {
-//         process_message(message, context);
-//     }
-// }
-//
-// async fn send_daily_message(context: Arc<Context>) {
-//     loop {
-//         context.unpin_daily_message();
-//
-//         let text = context.generate_daily_message();
-//
-//         if let Some(message) = context.send_message(text) {
-//             context.data.lock().unwrap().daily_message_id = Some(message.message_id);
-//             context.pin_daily_message();
-//         }
-//
-//         time::sleep(get_day_duration()).await;
-//
-//         if context.is_workout_over() {
-//             context.send_message(context.generate_final_message());
-//             context.unpin_daily_message();
-//             context.reset();
-//
-//             return;
-//         }
-//
-//         let cycle_ended = context.init_next_day();
-//
-//         if cycle_ended {
-//             context.send_message(context.generate_end_of_cycle_message());
-//         }
-//     }
-// }
-//
+
 fn get_day_duration() -> core::time::Duration {
     //return Duration::seconds(5).to_std().unwrap();
     let now = Utc::now();
@@ -302,70 +207,3 @@ fn get_day_duration() -> core::time::Duration {
         .to_std()
         .unwrap()
 }
-//
-// // async fn get_updates(context: Arc<Context>) {
-// //     let update_delay = Duration::seconds(1).to_std().unwrap();
-// //     let chat_id = context.get_chat_id();
-// //     let mut update_params: GetUpdatesParams = GetUpdatesParamsBuilder::default()
-// //         .allowed_updates(vec!["message".to_string()])
-// //         .build()
-// //         .unwrap();
-// //
-// //     loop {
-// //         time::sleep(update_delay).await;
-// //         let result = context.get_updates(&update_params);
-// //
-// //         println!("result: {:?}", result);
-// //
-// //         match result {
-// //             Ok(response) => {
-// //                 for update in response.result {
-// //                     update_params.offset = Some(update.update_id + 1);
-// //
-// //                     if let Some(message) = update.message {
-// //                         if message.chat.id == chat_id {
-// //                             process_message(message, &context);
-// //                         }
-// //                     }
-// //                 }
-// //             }
-// //             Err(error) => {
-// //                 println!("Failed to get updates: {:?}", error);
-// //             }
-// //         }
-// //     }
-// // }
-//
-// fn process_message(message: Message, context: &Arc<Context>) {
-//     if message.text.is_none() {
-//         return;
-//     }
-//
-//     let text = message.text.unwrap();
-//     let count = text.parse::<usize>();
-//
-//     let count = match count {
-//         Ok(count) => count,
-//         Err(err) => {
-//             println!("{:?}", err);
-//             return;
-//         }
-//     };
-//
-//     let username = message.from.unwrap().username.unwrap();
-//
-//     context.add_user_progress(username.clone(), count);
-//
-//     match context.update_daily_message() {
-//         Ok(response) => println!("Edit ok: {:?}", response),
-//         Err(err) => println!("Failed to update daily message: {:?}", err),
-//     }
-//
-//     if context.is_user_done(username.clone()) {
-//         context.send_message("🥳".to_string());
-//     }
-//
-//     if context.is_all_users_done() {
-//         context.send_message("На сегодня всё 🎉".to_string());
-//     }
-// }
