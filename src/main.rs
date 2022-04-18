@@ -78,6 +78,7 @@ async fn get_all_updates(api: Api, contexts: Arc<Mutex<Contexts>>) {
                         if let Some(message) = update.message.clone() {
                             if let Some(text) = message.text {
                                 if text == "/start" {
+                                    println!("Initializing context {}", &chat_id);
                                     init_context(Arc::clone(&contexts), chat_id, api.clone());
                                 }
                             }
@@ -102,7 +103,7 @@ async fn get_all_updates(api: Api, contexts: Arc<Mutex<Contexts>>) {
                         let count = match count {
                             Ok(count) => count,
                             Err(err) => {
-                                println!("{:?}", err);
+                                println!("Error parsing count: {:?}", err);
                                 continue;
                             }
                         };
@@ -176,11 +177,16 @@ async fn get_all_updates(api: Api, contexts: Arc<Mutex<Contexts>>) {
 
 fn init_context(contexts: Arc<Mutex<Contexts>>, chat_id: i64, api: Api) {
     let (tx, rx) = mpsc::channel(2048);
-    contexts.lock().unwrap().txs.insert(chat_id, tx);
+    let cloned_tx = tx.clone();
+    contexts.lock().unwrap().txs.insert(chat_id, cloned_tx);
 
     let context_data = ContextData::new(api, chat_id);
 
     tokio::spawn(async move { handle_commands(context_data, rx).await });
+
+    tokio::spawn(async move {
+        tx.send(ContextCommand::SendDailyMessage).await
+    });
 
     // let context = Arc::new(Context::new(chat_id, api));
     //
