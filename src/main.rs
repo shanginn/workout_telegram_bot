@@ -38,7 +38,12 @@ async fn send_daily_messages(contexts: Arc<Mutex<Contexts>>) {
             if context_tx.is_closed() {
                 contexts.lock().unwrap().txs.remove_entry(chat_id);
             } else {
-                context_tx.send(ContextCommand::SendDailyMessage).await;
+                context_tx
+                    .send(ContextCommand::SendDailyMessage)
+                    .await
+                    .unwrap_or_else(|err| {
+                        println!("Error sending SendDailyMessage command: {}", err);
+                    })
             }
         }
 
@@ -113,7 +118,10 @@ async fn get_all_updates(api: Api, contexts: Arc<Mutex<Contexts>>) {
                         let tx = txs[&chat_id].clone();
                         tokio::spawn(async move {
                             tx.send(ContextCommand::AddPushups { username, count })
-                                .await;
+                                .await
+                                .unwrap_or_else(|err| {
+                                    println!("Error sending AddPushups command: {}", err);
+                                })
                         });
                     }
                 }

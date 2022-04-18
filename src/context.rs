@@ -1,11 +1,10 @@
 use frankenstein::{
-    Api, EditMessageResponse, EditMessageTextParams, EditMessageTextParamsBuilder, Error,
-    GetUpdatesParams, Message, MethodResponse, PinChatMessageParams, PinChatMessageParamsBuilder,
-    SendMessageParams, SendMessageParamsBuilder, TelegramApi, UnpinChatMessageParams,
-    UnpinChatMessageParamsBuilder, Update,
+    Api, EditMessageResponse, EditMessageTextParams, EditMessageTextParamsBuilder, Error, Message,
+    PinChatMessageParams, PinChatMessageParamsBuilder, SendMessageParams, SendMessageParamsBuilder,
+    TelegramApi, UnpinChatMessageParams, UnpinChatMessageParamsBuilder,
 };
 use std::collections::HashMap;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 
 #[derive(Debug, Clone)]
 pub enum ContextState {
