@@ -206,7 +206,7 @@ fn get_chat_id_from_update(update: Update) -> (Update, Option<i64>) {
 }
 
 fn get_day_duration() -> core::time::Duration {
-    //return Duration::seconds(5).to_std().unwrap();
+    return Duration::seconds(10).to_std().unwrap();
     let now = Utc::now();
     let tomorrow_midnight = (now + Duration::days(1)).date().and_hms(0, 0, 0);
 

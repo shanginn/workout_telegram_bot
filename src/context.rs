@@ -51,11 +51,11 @@ impl ContextData {
             api,
             chat_id,
             daily_message_id: None,
-            cycle_increase: 10,
-            cycle_length: 1,
+            cycle_increase: 25,
+            cycle_length: 7,
             current_day: 0,
             progress: vec![HashMap::new()],
-            duration: 3,
+            duration: 35,
             repeats: 100,
             users: vec![],
         }
@@ -93,7 +93,7 @@ impl ContextData {
         self.current_day += 1;
         self.progress.push(HashMap::new());
 
-        if self.current_day != 1 && self.current_day % self.cycle_length == 0 {
+        if self.current_day != 1 && (self.current_day - 1) % self.cycle_length == 0 {
             self.repeats += self.cycle_increase;
 
             return true;
